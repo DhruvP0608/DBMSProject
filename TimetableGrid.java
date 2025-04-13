@@ -5,25 +5,39 @@ import javafx.scene.layout.GridPane;
 public class TimetableGrid {
     public static GridPane createTimetable() {
         GridPane grid = new GridPane();
-        grid.setHgap(10); // Horizontal spacing between columns
-        grid.setVgap(10); // Vertical spacing between rows
+        grid.setHgap(15); // Horizontal spacing between columns
+        grid.setVgap(15); // Vertical spacing between rows
+        grid.setStyle("-fx-border-color: blue; -fx-border-width: 2; -fx-border-radius: 5; -fx-padding: 15;");
 
         // Add headers for days
-        grid.add(new Label("Time Slot"), 0, 0);
-        grid.add(new Label("Monday"), 1, 0);
-        grid.add(new Label("Tuesday"), 2, 0);
-        grid.add(new Label("Wednesday"), 3, 0);
-        grid.add(new Label("Thursday"), 4, 0);
-        grid.add(new Label("Friday"), 5, 0);
+        Label timeSlotHeader = new Label("Time Slot");
+        timeSlotHeader.setStyle("-fx-font-size: 16; -fx-font-weight: bold; -fx-text-fill: darkblue;");
+        grid.add(timeSlotHeader, 0, 0);
 
-        // Add sample timetable entries
-        grid.add(new Label("9:00 - 9:50"), 0, 1);
-        grid.add(new Label("OOP"), 1, 1);
-        grid.add(new Label("DSA"), 2, 1);
-        grid.add(new Label("COA"), 3, 1);
-        grid.add(new Label("Statistics"), 4, 1);
-        grid.add(new Label("Lunch Break"), 0, 4);
+        String[] days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday"};
+        for (int i = 0; i < days.length; i++) {
+            Label dayLabel = new Label(days[i]);
+            dayLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: green;");
+            grid.add(dayLabel, i + 1, 0);
+        }
+
+        // Add sample timetable entries with styling
+        grid.add(createStyledLabel("9:00 - 9:50", "red"), 0, 1);
+        grid.add(createStyledLabel("OOP", "purple"), 1, 1);
+        grid.add(createStyledLabel("DSA", "orange"), 2, 1);
+        grid.add(createStyledLabel("COA", "blue"), 3, 1);
+        grid.add(createStyledLabel("Statistics", "darkgreen"), 4, 1);
+
+        // Add lunch break
+        grid.add(createStyledLabel("12:30 - 1:30", "black"), 0, 4);
+        grid.add(createStyledLabel("Lunch Break", "darkred"), 1, 4, 5, 1);
 
         return grid;
+    }
+
+    private static Label createStyledLabel(String text, String color) {
+        Label label = new Label(text);
+        label.setStyle("-fx-font-size: 14; -fx-text-fill: " + color + ";");
+        return label;
     }
 }
