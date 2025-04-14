@@ -1,4 +1,5 @@
 package MiniProject;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -11,6 +12,9 @@ public class TimetableGenerator {
     private static final String BREAK = "10:40-10:50";
     private static final String AFTERNOON_SLOT = "2:00-4:00";
     private static final String[] DAYS = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday"};
+
+    private final Map<String, Map<String, List<String>>> classTimetables = new HashMap<>();
+    private final Map<String, Map<String, String>> teacherAssignments = new HashMap<>();
 
     public void generateAndDisplayTimetable(Connection connection) {
         try {
@@ -26,10 +30,12 @@ public class TimetableGenerator {
 
                 System.out.println("Timetable for Class: " + className);
 
+                Map<String, List<String>> dailyTimetable = new HashMap<>();
+                Map<String, String> teacherMap = new HashMap<>();
+
                 Map<Integer, Integer> weeklyAssignments = new HashMap<>();
                 Map<Integer, Integer> weeklyCredits = new HashMap<>();
                 Map<Integer, String> courseNames = new HashMap<>();
-                Map<Integer, String> teacherAssignments = new HashMap<>();
                 List<Integer> labCourses = new ArrayList<>();
                 List<Integer> nonLabCourses = new ArrayList<>();
                 List<String> availableTeachers = new ArrayList<>();
@@ -37,7 +43,6 @@ public class TimetableGenerator {
                 String facultyQuery = "SELECT FacultyName FROM Faculty";
                 PreparedStatement facultyStmt = connection.prepareStatement(facultyQuery);
                 ResultSet facultyResults = facultyStmt.executeQuery();
-
                 while (facultyResults.next()) {
                     availableTeachers.add(facultyResults.getString("FacultyName"));
                 }
@@ -59,7 +64,7 @@ public class TimetableGenerator {
                     courseNames.put(courseID, courseName);
 
                     String randomTeacher = availableTeachers.get(random.nextInt(availableTeachers.size()));
-                    teacherAssignments.put(courseID, randomTeacher);
+                    teacherMap.put(courseName, randomTeacher);
 
                     if (courseName.toLowerCase().contains("lab")) {
                         labCourses.add(courseID);
@@ -75,6 +80,7 @@ public class TimetableGenerator {
                     int morningIndex = 0;
                     boolean labAssigned = false;
                     Set<Integer> coursesAssignedToday = new HashSet<>();
+                    List<String> schedule = new ArrayList<>();
 
                     Collections.shuffle(nonLabCourses, random);
 
@@ -84,7 +90,7 @@ public class TimetableGenerator {
 
                         if (day.equals("Friday") || (!day.equals("Friday") && !coursesAssignedToday.contains(courseID))) {
                             if (assignmentsSoFar < maxCredits && morningIndex < MORNING_SLOTS.length) {
-                                assignSlot(connection, classroomID, courseID, MORNING_SLOTS[morningIndex], day);
+                                schedule.add(courseNames.get(courseID) + " | Time: " + MORNING_SLOTS[morningIndex]);
                                 System.out.println("    - " + courseNames.get(courseID) + " | Time: " + MORNING_SLOTS[morningIndex]);
                                 morningIndex++;
                                 weeklyAssignments.put(courseID, assignmentsSoFar + 1);
@@ -93,10 +99,11 @@ public class TimetableGenerator {
                         }
 
                         if (morningIndex == 2) {
-                            System.out.println("    - Break | Time: " + BREAK);
+                            schedule.add("Break | Time: " + BREAK);
                         }
                     }
 
+                    schedule.add("Lunch Break | Time: " + LUNCH_BREAK);
                     System.out.println("    - Lunch Break | Time: " + LUNCH_BREAK);
 
                     if (!labAssigned && Arrays.asList("Monday", "Wednesday", "Friday").contains(day)) {
@@ -105,8 +112,9 @@ public class TimetableGenerator {
                             int assignmentsSoFar = weeklyAssignments.get(courseID);
 
                             if (assignmentsSoFar < maxCredits && !coursesAssignedToday.contains(courseID)) {
-                                assignSlot(connection, classroomID, courseID, AFTERNOON_SLOT, day);
-                                System.out.println("    - " + courseNames.get(courseID) + " | Time: " + AFTERNOON_SLOT);
+                                String labEntry = courseNames.get(courseID) + "| Time: " + AFTERNOON_SLOT;
+                                schedule.add(labEntry); // Ensure the lab is added to the day's schedule
+                                System.out.println("    - " + labEntry);
                                 weeklyAssignments.put(courseID, assignmentsSoFar + 1);
                                 labAssigned = true;
                                 coursesAssignedToday.add(courseID);
@@ -114,15 +122,20 @@ public class TimetableGenerator {
                             }
                         }
                     }
+
+                    dailyTimetable.put(day, schedule); // Save day's schedule to dailyTimetable
                     System.out.println();
                 }
+
+                classTimetables.put(className, dailyTimetable);
+                teacherAssignments.put(className, teacherMap);
 
                 System.out.println("Teacher Assignments for Class: " + className);
                 System.out.println("-------------------------------------");
                 System.out.println("Subject                | Teacher");
                 System.out.println("-------------------------------------");
-                for (Map.Entry<Integer, String> entry : teacherAssignments.entrySet()) {
-                    System.out.printf("%-20s | %s%n", courseNames.get(entry.getKey()), entry.getValue());
+                for (Map.Entry<String, String> entry : teacherMap.entrySet()) {
+                    System.out.printf("%-20s | %s%n", entry.getKey(), entry.getValue());
                 }
                 System.out.println();
             }
@@ -131,23 +144,11 @@ public class TimetableGenerator {
         }
     }
 
-    private void assignSlot(Connection connection, int classroomID, int courseID, String timeslot, String day) throws Exception {
-        String insertQuery = "INSERT INTO Schedules (ClassroomID, CourseID, Day, TimeSlot) VALUES (?, ?, ?, ?)";
-        PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
-        insertStmt.setInt(1, classroomID);
-        insertStmt.setInt(2, courseID);
-        insertStmt.setString(3, day);
-        insertStmt.setString(4, timeslot);
-        insertStmt.executeUpdate();
+    public Map<String, List<String>> getTimetable(String className) {
+        return classTimetables.getOrDefault(className, new HashMap<>());
     }
 
-    public static void main(String[] args) {
-        Connection connection = DatabaseConnection.getConnection();
-        if (connection != null) {
-            TimetableGenerator generator = new TimetableGenerator();
-            generator.generateAndDisplayTimetable(connection);
-        } else {
-            System.out.println("Failed to connect to the database.");
-        }
+    public Map<String, String> getTeacherAssignments(String className) {
+        return teacherAssignments.getOrDefault(className, new HashMap<>());
     }
 }
